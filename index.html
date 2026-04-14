@@ -262,6 +262,7 @@
         <button type="button" id="mode-remove">удалить</button>
         <button type="button" id="save-layout">сохранить</button>
         <button type="button" id="clear">очистить</button>
+        <button type="button" id="reconnect">переподключиться</button>
         <button type="button" id="logout">выйти</button>
       </div>
       <div class="status" id="status">Подключение...</div>
@@ -304,6 +305,7 @@
     const removeModeButton = document.getElementById("mode-remove");
     const saveLayoutButton = document.getElementById("save-layout");
     const clearButton = document.getElementById("clear");
+    const reconnectButton = document.getElementById("reconnect");
     const logoutButton = document.getElementById("logout");
 
     const functionUrl = SUPABASE_FUNCTIONS_BASE.replace(/\/$/, "") + "/" + GRID_API_FUNCTION_NAME;
@@ -316,6 +318,7 @@
     let editMode = "mark";
     let requestInFlight = false;
     let lastError = "";
+    let networkOffline = !navigator.onLine;
 
     function createCells(rows, cols, existing = []) {
       const nextCells = [];
@@ -389,6 +392,11 @@
       const roleLabel = canEditLayout() ? "режим: разработчик" : "режим: обычный";
       const summary = state.rows + " x " + state.cols + " | квадратов: " + countEnabledCells(state.cells) + " | " + roleLabel;
 
+      if (networkOffline) {
+        setStatus(summary + " | сеть недоступна, нажмите «переподключиться»", true);
+        return;
+      }
+
       if (lastError) {
         setStatus(summary + " | " + lastError, true);
         return;
@@ -432,15 +440,18 @@
       addModeButton.disabled = layoutBlocked || requestInFlight;
       removeModeButton.disabled = layoutBlocked || requestInFlight;
       clearButton.disabled = layoutBlocked || requestInFlight;
+      reconnectButton.disabled = requestInFlight;
       logoutButton.disabled = requestInFlight;
     }
 
     function render() {
       board.innerHTML = "";
       board.style.gridTemplateColumns = "repeat(" + state.cols + ", var(--cell-size))";
+
       if (!canEditLayout()) {
         editMode = "mark";
       }
+
       updateModeButtons();
       updateControls();
       updateStatus();
@@ -497,6 +508,7 @@
             emptyCell.className = "cell-empty";
             emptyCell.disabled = requestInFlight || !canEditLayout() || editMode !== "add";
             emptyCell.setAttribute("aria-label", "Пустая ячейка " + (row + 1) + ":" + (col + 1));
+
             emptyCell.addEventListener("click", () => {
               if (requestInFlight || !canEditLayout() || editMode !== "add") {
                 return;
@@ -507,6 +519,7 @@
               lastError = "";
               render();
             });
+
             slot.appendChild(emptyCell);
           }
 
@@ -516,24 +529,34 @@
     }
 
     async function apiRequest(action, payload = {}) {
-      const response = await fetch(functionUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action,
-          session_token: sessionToken,
-          ...payload
-        })
-      });
+      try {
+        const response = await fetch(functionUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            action,
+            session_token: sessionToken,
+            ...payload
+          })
+        });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || "ошибка запроса");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "ошибка запроса");
+        }
+
+        networkOffline = false;
+        return data;
+      } catch (error) {
+        if (!navigator.onLine || error instanceof TypeError) {
+          networkOffline = !navigator.onLine;
+          throw new Error("сбой сети или VPN, переключитесь и нажмите «переподключиться»");
+        }
+
+        throw error;
       }
-
-      return data;
     }
 
     async function login(code) {
@@ -570,6 +593,7 @@
 
         const data = await apiRequest("get_state");
         accessRole = data.access_role || accessRole;
+
         if (!layoutDirty) {
           state = normalizeState(data.state);
           serverVersion = Number(data.version) || 1;
@@ -582,6 +606,11 @@
           logout();
           return;
         }
+
+        if (!navigator.onLine) {
+          networkOffline = true;
+        }
+
         lastError = error.message;
       } finally {
         requestInFlight = false;
@@ -618,6 +647,10 @@
           logout();
           return false;
         } else {
+          if (!navigator.onLine) {
+            networkOffline = true;
+          }
+
           lastError = error.message;
         }
 
@@ -643,12 +676,25 @@
     function logout() {
       sessionToken = "";
       accessRole = "user";
+      networkOffline = !navigator.onLine;
       localStorage.removeItem(SESSION_STORAGE_KEY);
       layoutDirty = false;
       lastError = "";
       setGateError("");
       accessCodeInput.value = "";
       showGate();
+    }
+
+    async function reconnect() {
+      networkOffline = !navigator.onLine;
+      lastError = "";
+      render();
+
+      if (!sessionToken) {
+        return;
+      }
+
+      await fetchState(false);
     }
 
     gateForm.addEventListener("submit", async (event) => {
@@ -658,6 +704,7 @@
         setGateError("введите код доступа");
         return;
       }
+
       await login(code);
     });
 
@@ -665,6 +712,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       resizeGrid(state.rows + 1, state.cols);
     });
 
@@ -672,6 +720,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       resizeGrid(Math.max(MIN_SIZE, state.rows - 1), state.cols);
     });
 
@@ -679,6 +728,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       resizeGrid(state.rows, state.cols + 1);
     });
 
@@ -686,6 +736,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       resizeGrid(state.rows, Math.max(MIN_SIZE, state.cols - 1));
     });
 
@@ -693,6 +744,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       editMode = editMode === "add" ? "mark" : "add";
       render();
     });
@@ -701,6 +753,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       editMode = editMode === "remove" ? "mark" : "remove";
       render();
     });
@@ -709,6 +762,7 @@
       if (!canEditLayout()) {
         return;
       }
+
       await saveState();
     });
 
@@ -716,14 +770,31 @@
       if (!canEditLayout()) {
         return;
       }
+
       state.cells = createCells(state.rows, state.cols);
       layoutDirty = true;
       lastError = "";
       render();
     });
 
+    reconnectButton.addEventListener("click", async () => {
+      await reconnect();
+    });
+
     logoutButton.addEventListener("click", () => {
       logout();
+    });
+
+    window.addEventListener("online", async () => {
+      networkOffline = false;
+      lastError = "";
+      render();
+      await reconnect();
+    });
+
+    window.addEventListener("offline", () => {
+      networkOffline = true;
+      render();
     });
 
     if (sessionToken) {
