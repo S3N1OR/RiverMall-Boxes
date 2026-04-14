@@ -426,6 +426,7 @@
     let requestInFlight = false;
     let lastError = "";
     let networkOffline = !navigator.onLine;
+    let boardScaleFrame = 0;
 
     function createCells(rows, cols, existing = []) {
       const nextCells = [];
@@ -568,6 +569,11 @@
     function syncBoardScale() {
       const compactView = window.matchMedia("(max-width: 640px)").matches;
 
+      if (boardScaleFrame) {
+        cancelAnimationFrame(boardScaleFrame);
+        boardScaleFrame = 0;
+      }
+
       editorShell.style.transform = "scale(1)";
 
       if (!compactView) {
@@ -575,14 +581,15 @@
         return;
       }
 
-      requestAnimationFrame(() => {
+      boardScaleFrame = requestAnimationFrame(() => {
         const availableWidth = boardScale.clientWidth;
-        const contentWidth = editorShell.getBoundingClientRect().width;
-        const contentHeight = editorShell.getBoundingClientRect().height;
+        const contentWidth = editorShell.scrollWidth;
+        const contentHeight = editorShell.scrollHeight;
         const scale = contentWidth > 0 ? Math.min(1, availableWidth / contentWidth) : 1;
 
         editorShell.style.transform = "scale(" + scale + ")";
         boardScale.style.height = Math.ceil(contentHeight * scale) + "px";
+        boardScaleFrame = 0;
       });
     }
 
