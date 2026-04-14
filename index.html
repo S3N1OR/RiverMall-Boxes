@@ -628,7 +628,7 @@
               state.rows <= MIN_SIZE
             )
           );
-        } else {
+        } else if (editMode) {
           const spacer = document.createElement("div");
           spacer.className = "column-add-spacer";
           rowWrap.appendChild(spacer);
