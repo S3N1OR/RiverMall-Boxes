@@ -16,6 +16,7 @@
       --danger: #8a1c1c;
       --cell-size: 56px;
       --gap: 10px;
+      --control-size: 36px;
     }
 
     * {
@@ -116,10 +117,6 @@
       cursor: pointer;
     }
 
-    button:hover:not(:disabled) {
-      background: #f3f3f3;
-    }
-
     button:disabled {
       opacity: 0.45;
       cursor: not-allowed;
@@ -144,15 +141,99 @@
       border: 1px solid var(--border);
       border-radius: 20px;
       padding: 18px;
-      overflow: auto;
+      overflow: hidden;
       background: var(--surface);
     }
 
-    .board {
+    .board-scale {
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .editor-shell {
       display: grid;
-      justify-content: center;
       gap: var(--gap);
-      min-height: 200px;
+      align-items: start;
+      width: max-content;
+      transform-origin: top left;
+    }
+
+    .column-controls {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: var(--cell-size);
+      justify-content: start;
+      margin-left: calc(var(--control-size) + var(--gap));
+      gap: var(--gap);
+    }
+
+    .column-controls .grid-control {
+      justify-self: center;
+    }
+
+    .column-controls.is-hidden {
+      visibility: hidden;
+      height: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .board-row {
+      display: flex;
+      align-items: center;
+      gap: var(--gap);
+    }
+
+    .rows {
+      display: grid;
+      gap: var(--gap);
+    }
+
+    .row-cells {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: var(--cell-size);
+      gap: var(--gap);
+    }
+
+    .column-add-spacer {
+      width: var(--control-size);
+      height: var(--control-size);
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      background: transparent;
+      visibility: hidden;
+    }
+
+    .grid-control {
+      width: var(--control-size);
+      height: var(--control-size);
+      padding: 0;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .grid-control.grid-add {
+      font-size: 22px;
+    }
+
+    .grid-control.grid-remove {
+      color: #7a7a7a;
+    }
+
+    .grid-control.is-hidden {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .bottom-add-row {
+      display: flex;
+      gap: var(--gap);
+      align-items: center;
     }
 
     .cell-slot {
@@ -182,17 +263,9 @@
       background: #ffffff;
     }
 
-    .cell:hover:not(:disabled) {
-      background: #f7f7f7;
-    }
-
     .cell-empty {
       border: 1px dashed #cfcfcf;
-      background: transparent;
-    }
-
-    .cell-empty:hover:not(:disabled) {
-      background: #f8f8f8;
+      background: #f2f2f2;
     }
 
     .cell.is-active::before,
@@ -217,8 +290,9 @@
 
     @media (max-width: 640px) {
       :root {
-        --cell-size: 48px;
+        --cell-size: 46px;
         --gap: 8px;
+        --control-size: 32px;
       }
 
       .page,
@@ -234,6 +308,43 @@
 
       .panel {
         justify-content: center;
+        border-radius: 14px;
+      }
+
+      .controls {
+        justify-content: center;
+        width: 100%;
+      }
+
+      .controls button {
+        flex: 1 1 calc(50% - 5px);
+      }
+
+      .status {
+        width: 100%;
+        text-align: left;
+      }
+
+      .board-wrap {
+        border-radius: 16px;
+      }
+
+      .editor-shell {
+        min-width: 0;
+      }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      button:hover:not(:disabled) {
+        background: #f3f3f3;
+      }
+
+      .cell:hover:not(:disabled) {
+        background: #f7f7f7;
+      }
+
+      .cell-empty:hover:not(:disabled) {
+        background: #ebebeb;
       }
     }
   </style>
@@ -254,22 +365,21 @@
   <div class="page hidden" id="app">
     <section class="panel">
       <div class="controls">
-        <button type="button" id="add-row">+ ряд</button>
-        <button type="button" id="remove-row">- ряд</button>
-        <button type="button" id="add-col">+ столбец</button>
-        <button type="button" id="remove-col">- столбец</button>
-        <button type="button" id="mode-add">добавить</button>
-        <button type="button" id="mode-remove">удалить</button>
-        <button type="button" id="save-layout">сохранить</button>
-        <button type="button" id="clear">очистить</button>
-        <button type="button" id="reconnect">переподключиться</button>
-        <button type="button" id="logout">выйти</button>
+        <button type="button" id="edit-toggle" class="hidden">Редактировать</button>
+        <button type="button" id="reconnect">Переподключиться</button>
+        <button type="button" id="logout">Выйти</button>
       </div>
       <div class="status" id="status">Подключение...</div>
     </section>
 
-    <section class="board-wrap">
-      <div class="board" id="board" aria-label="Сетка квадратов"></div>
+    <section class="board-wrap" id="board-wrap">
+      <div class="board-scale" id="board-scale">
+        <div class="editor-shell" id="editor-shell">
+          <div class="column-controls" id="column-controls"></div>
+          <div class="rows" id="rows"></div>
+          <div class="bottom-add-row" id="bottom-add-row"></div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -295,16 +405,13 @@
     const accessCodeInput = document.getElementById("access-code");
     const gateError = document.getElementById("gate-error");
 
-    const board = document.getElementById("board");
+    const boardScale = document.getElementById("board-scale");
+    const editorShell = document.getElementById("editor-shell");
+    const rowsRoot = document.getElementById("rows");
+    const columnControls = document.getElementById("column-controls");
+    const bottomAddRow = document.getElementById("bottom-add-row");
     const status = document.getElementById("status");
-    const addRowButton = document.getElementById("add-row");
-    const removeRowButton = document.getElementById("remove-row");
-    const addColButton = document.getElementById("add-col");
-    const removeColButton = document.getElementById("remove-col");
-    const addModeButton = document.getElementById("mode-add");
-    const removeModeButton = document.getElementById("mode-remove");
-    const saveLayoutButton = document.getElementById("save-layout");
-    const clearButton = document.getElementById("clear");
+    const editToggleButton = document.getElementById("edit-toggle");
     const reconnectButton = document.getElementById("reconnect");
     const logoutButton = document.getElementById("logout");
 
@@ -315,7 +422,7 @@
     let state = normalizeState(DEFAULT_STATE);
     let serverVersion = 0;
     let layoutDirty = false;
-    let editMode = "mark";
+    let editMode = false;
     let requestInFlight = false;
     let lastError = "";
     let networkOffline = !navigator.onLine;
@@ -393,7 +500,7 @@
       const summary = state.rows + " x " + state.cols + " | квадратов: " + countEnabledCells(state.cells) + " | " + roleLabel;
 
       if (networkOffline) {
-        setStatus(summary + " | сеть недоступна, нажмите «переподключиться»", true);
+        setStatus(summary + " | сеть недоступна, нажмите «Переподключиться»", true);
         return;
       }
 
@@ -407,60 +514,133 @@
         return;
       }
 
-      if (layoutDirty) {
+      if (editMode && layoutDirty) {
         setStatus(summary + " | есть несохранённые изменения");
+        return;
+      }
+
+      if (editMode) {
+        setStatus(summary + " | редактирование");
         return;
       }
 
       setStatus(summary + " | синхронизировано");
     }
 
-    function updateModeButtons() {
-      addModeButton.classList.toggle("is-selected", editMode === "add");
-      removeModeButton.classList.toggle("is-selected", editMode === "remove");
-    }
-
     function updateControls() {
-      const layoutBlocked = !canEditLayout();
+      const developer = canEditLayout();
 
-      addRowButton.classList.toggle("hidden", layoutBlocked);
-      removeRowButton.classList.toggle("hidden", layoutBlocked);
-      addColButton.classList.toggle("hidden", layoutBlocked);
-      removeColButton.classList.toggle("hidden", layoutBlocked);
-      addModeButton.classList.toggle("hidden", layoutBlocked);
-      removeModeButton.classList.toggle("hidden", layoutBlocked);
-      saveLayoutButton.classList.toggle("hidden", layoutBlocked);
-      clearButton.classList.toggle("hidden", layoutBlocked);
-
-      removeRowButton.disabled = layoutBlocked || state.rows <= MIN_SIZE || requestInFlight;
-      removeColButton.disabled = layoutBlocked || state.cols <= MIN_SIZE || requestInFlight;
-      saveLayoutButton.disabled = layoutBlocked || !layoutDirty || requestInFlight;
-      addRowButton.disabled = layoutBlocked || requestInFlight;
-      addColButton.disabled = layoutBlocked || requestInFlight;
-      addModeButton.disabled = layoutBlocked || requestInFlight;
-      removeModeButton.disabled = layoutBlocked || requestInFlight;
-      clearButton.disabled = layoutBlocked || requestInFlight;
+      editToggleButton.classList.toggle("hidden", !developer);
+      editToggleButton.disabled = requestInFlight;
       reconnectButton.disabled = requestInFlight;
       logoutButton.disabled = requestInFlight;
-    }
 
-    function render() {
-      board.innerHTML = "";
-      board.style.gridTemplateColumns = "repeat(" + state.cols + ", var(--cell-size))";
-
-      if (!canEditLayout()) {
-        editMode = "mark";
+      if (!developer) {
+        return;
       }
 
-      updateModeButtons();
-      updateControls();
-      updateStatus();
+      if (!editMode) {
+        editToggleButton.textContent = "Редактировать";
+        editToggleButton.classList.remove("is-selected");
+        return;
+      }
+
+      if (layoutDirty) {
+        editToggleButton.textContent = "Сохранить";
+      } else {
+        editToggleButton.textContent = "Готово";
+      }
+
+      editToggleButton.classList.add("is-selected");
+    }
+
+    function createGridControl(label, title, className, onClick, disabled = false) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "grid-control " + className;
+      button.textContent = label;
+      button.title = title;
+      button.disabled = disabled || requestInFlight;
+      button.addEventListener("click", onClick);
+      return button;
+    }
+
+    function syncBoardScale() {
+      const compactView = window.matchMedia("(max-width: 640px)").matches;
+
+      editorShell.style.transform = "scale(1)";
+
+      if (!compactView) {
+        boardScale.style.height = "";
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        const availableWidth = boardScale.clientWidth;
+        const contentWidth = editorShell.getBoundingClientRect().width;
+        const contentHeight = editorShell.getBoundingClientRect().height;
+        const scale = contentWidth > 0 ? Math.min(1, availableWidth / contentWidth) : 1;
+
+        editorShell.style.transform = "scale(" + scale + ")";
+        boardScale.style.height = Math.ceil(contentHeight * scale) + "px";
+      });
+    }
+
+    function renderColumnControls() {
+      columnControls.innerHTML = "";
+      const visible = canEditLayout() && editMode;
+      columnControls.classList.toggle("is-hidden", !visible);
+
+      if (!visible) {
+        return;
+      }
+
+      for (let col = 0; col < state.cols; col += 1) {
+        const removeButton = createGridControl(
+          "−",
+          "Удалить столбец",
+          "grid-remove",
+          () => removeColumn(col),
+          state.cols <= MIN_SIZE
+        );
+        columnControls.appendChild(removeButton);
+      }
+
+      columnControls.appendChild(
+        createGridControl("+", "Добавить столбец", "grid-add", () => addColumn())
+      );
+    }
+
+    function renderRows() {
+      rowsRoot.innerHTML = "";
 
       for (let row = 0; row < state.rows; row += 1) {
+        const rowWrap = document.createElement("div");
+        rowWrap.className = "board-row";
+
+        if (canEditLayout() && editMode) {
+          rowWrap.appendChild(
+            createGridControl(
+              "−",
+              "Удалить ряд",
+              "grid-remove",
+              () => removeRow(row),
+              state.rows <= MIN_SIZE
+            )
+          );
+        } else {
+          const spacer = document.createElement("div");
+          spacer.className = "column-add-spacer";
+          rowWrap.appendChild(spacer);
+        }
+
+        const rowCells = document.createElement("div");
+        rowCells.className = "row-cells";
+
         for (let col = 0; col < state.cols; col += 1) {
           const currentCell = state.cells[row][col];
           const slot = document.createElement("div");
-          const hideEmptyCell = !currentCell.enabled && (!canEditLayout() || (!layoutDirty && editMode !== "add"));
+          const hideEmptyCell = !currentCell.enabled && !editMode;
 
           slot.className = "cell-slot";
           if (hideEmptyCell) {
@@ -483,15 +663,11 @@
                 return;
               }
 
-              if (canEditLayout() && editMode === "remove") {
+              if (canEditLayout() && editMode) {
                 state.cells[row][col] = { enabled: false, marked: false };
                 layoutDirty = true;
                 lastError = "";
                 render();
-                return;
-              }
-
-              if (canEditLayout() && editMode === "add") {
                 return;
               }
 
@@ -506,11 +682,10 @@
             const emptyCell = document.createElement("button");
             emptyCell.type = "button";
             emptyCell.className = "cell-empty";
-            emptyCell.disabled = requestInFlight || !canEditLayout() || editMode !== "add";
+            emptyCell.disabled = requestInFlight || !(canEditLayout() && editMode);
             emptyCell.setAttribute("aria-label", "Пустая ячейка " + (row + 1) + ":" + (col + 1));
-
             emptyCell.addEventListener("click", () => {
-              if (requestInFlight || !canEditLayout() || editMode !== "add") {
+              if (requestInFlight || !(canEditLayout() && editMode)) {
                 return;
               }
 
@@ -519,13 +694,87 @@
               lastError = "";
               render();
             });
-
             slot.appendChild(emptyCell);
           }
 
-          board.appendChild(slot);
+          rowCells.appendChild(slot);
         }
+
+        rowWrap.appendChild(rowCells);
+        rowsRoot.appendChild(rowWrap);
       }
+    }
+
+    function renderBottomAdd() {
+      bottomAddRow.innerHTML = "";
+
+      if (!(canEditLayout() && editMode)) {
+        return;
+      }
+
+
+      const addRowButton = createGridControl("+", "Добавить ряд", "grid-add", () => addRow());
+      bottomAddRow.appendChild(addRowButton);
+    }
+
+    function render() {
+      if (!canEditLayout()) {
+        editMode = false;
+        layoutDirty = false;
+      }
+
+      updateControls();
+      updateStatus();
+      renderColumnControls();
+      renderRows();
+      renderBottomAdd();
+      syncBoardScale();
+    }
+
+    function addRow() {
+      state.rows += 1;
+      state.cells.push(Array.from({ length: state.cols }, () => ({ enabled: false, marked: false })));
+      layoutDirty = true;
+      lastError = "";
+      render();
+    }
+
+    function removeRow(rowIndex) {
+      if (state.rows <= MIN_SIZE) {
+        return;
+      }
+
+      state.cells.splice(rowIndex, 1);
+      state.rows -= 1;
+      layoutDirty = true;
+      lastError = "";
+      render();
+    }
+
+    function addColumn() {
+      for (const row of state.cells) {
+        row.push({ enabled: false, marked: false });
+      }
+
+      state.cols += 1;
+      layoutDirty = true;
+      lastError = "";
+      render();
+    }
+
+    function removeColumn(colIndex) {
+      if (state.cols <= MIN_SIZE) {
+        return;
+      }
+
+      for (const row of state.cells) {
+        row.splice(colIndex, 1);
+      }
+
+      state.cols -= 1;
+      layoutDirty = true;
+      lastError = "";
+      render();
     }
 
     async function apiRequest(action, payload = {}) {
@@ -552,7 +801,7 @@
       } catch (error) {
         if (!navigator.onLine || error instanceof TypeError) {
           networkOffline = !navigator.onLine;
-          throw new Error("сбой сети или VPN, переключитесь и нажмите «переподключиться»");
+          throw new Error("сбой сети или VPN, переключитесь и нажмите «Переподключиться»");
         }
 
         throw error;
@@ -661,24 +910,13 @@
       }
     }
 
-    function resizeGrid(nextRows, nextCols) {
-      state = {
-        rows: nextRows,
-        cols: nextCols,
-        cells: createCells(nextRows, nextCols, state.cells)
-      };
-
-      layoutDirty = true;
-      lastError = "";
-      render();
-    }
-
     function logout() {
       sessionToken = "";
       accessRole = "user";
       networkOffline = !navigator.onLine;
       localStorage.removeItem(SESSION_STORAGE_KEY);
       layoutDirty = false;
+      editMode = false;
       lastError = "";
       setGateError("");
       accessCodeInput.value = "";
@@ -708,73 +946,30 @@
       await login(code);
     });
 
-    addRowButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
+    editToggleButton.addEventListener("click", async () => {
+      if (!canEditLayout() || requestInFlight) {
         return;
       }
 
-      resizeGrid(state.rows + 1, state.cols);
-    });
-
-    removeRowButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
+      if (!editMode) {
+        editMode = true;
+        lastError = "";
+        render();
         return;
       }
 
-      resizeGrid(Math.max(MIN_SIZE, state.rows - 1), state.cols);
-    });
-
-    addColButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
+      if (!layoutDirty) {
+        editMode = false;
+        lastError = "";
+        render();
         return;
       }
 
-      resizeGrid(state.rows, state.cols + 1);
-    });
-
-    removeColButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
-        return;
+      const saved = await saveState();
+      if (saved) {
+        editMode = false;
+        render();
       }
-
-      resizeGrid(state.rows, Math.max(MIN_SIZE, state.cols - 1));
-    });
-
-    addModeButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
-        return;
-      }
-
-      editMode = editMode === "add" ? "mark" : "add";
-      render();
-    });
-
-    removeModeButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
-        return;
-      }
-
-      editMode = editMode === "remove" ? "mark" : "remove";
-      render();
-    });
-
-    saveLayoutButton.addEventListener("click", async () => {
-      if (!canEditLayout()) {
-        return;
-      }
-
-      await saveState();
-    });
-
-    clearButton.addEventListener("click", () => {
-      if (!canEditLayout()) {
-        return;
-      }
-
-      state.cells = createCells(state.rows, state.cols);
-      layoutDirty = true;
-      lastError = "";
-      render();
     });
 
     reconnectButton.addEventListener("click", async () => {
@@ -796,6 +991,8 @@
       networkOffline = true;
       render();
     });
+
+    window.addEventListener("resize", syncBoardScale);
 
     if (sessionToken) {
       showApp();
