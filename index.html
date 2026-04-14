@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сетка квадратов</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --text: #111111;
+      --muted: #666666;
+      --border: #d9d9d9;
+      --accent: #111111;
+      --danger: #8a1c1c;
+      --cell-size: 56px;
+      --gap: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.4 Arial, sans-serif;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .gate {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .gate-card {
+      width: min(100%, 420px);
+      padding: 24px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+
+    .gate-card h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+    }
+
+    .gate-card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+    }
+
+    .gate-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .gate-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+    }
+
+    .gate-error {
+      min-height: 20px;
+      color: var(--danger);
+      font-size: 14px;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 24px;
+    }
+
+    .panel {
+      width: min(100%, 980px);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid var(--accent);
+      background: #ffffff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f3f3f3;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button.is-selected {
+      background: #111111;
+      color: #ffffff;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status.is-error {
+      color: var(--danger);
+    }
+
+    .board-wrap {
+      width: min(100%, 980px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px;
+      overflow: auto;
+      background: var(--surface);
+    }
+
+    .board {
+      display: grid;
+      justify-content: center;
+      gap: var(--gap);
+      min-height: 200px;
+    }
+
+    .cell-slot {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border: 1px dashed #d6d6d6;
+      background: #fcfcfc;
+      border-radius: 8px;
+    }
+
+    .cell-slot.is-hidden {
+      visibility: hidden;
+    }
+
+    .cell,
+    .cell-empty {
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+      padding: 0;
+      font: inherit;
+    }
+
+    .cell {
+      position: relative;
+      border: 1px solid #bfbfbf;
+      background: #ffffff;
+    }
+
+    .cell:hover:not(:disabled) {
+      background: #f7f7f7;
+    }
+
+    .cell-empty {
+      border: 1px dashed #cfcfcf;
+      background: transparent;
+    }
+
+    .cell-empty:hover:not(:disabled) {
+      background: #f8f8f8;
+    }
+
+    .cell.is-active::before,
+    .cell.is-active::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 34px;
+      height: 2px;
+      background: var(--accent);
+      transform-origin: center;
+    }
+
+    .cell.is-active::before {
+      transform: translate(-50%, -50%) rotate(45deg);
+    }
+
+    .cell.is-active::after {
+      transform: translate(-50%, -50%) rotate(-45deg);
+    }
+
+    @media (max-width: 640px) {
+      :root {
+        --cell-size: 48px;
+        --gap: 8px;
+      }
+
+      .page,
+      .gate {
+        padding: 16px;
+      }
+
+      .panel,
+      .board-wrap,
+      .gate-card {
+        padding: 14px;
+      }
+
+      .panel {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="gate" id="gate">
+    <div class="gate-card">
+      <h1>Доступ</h1>
+      <p>Введите код доступа. Без него сетка не откроется.</p>
+      <form class="gate-form" id="gate-form">
+        <input class="gate-input" id="access-code" type="password" placeholder="Код доступа" autocomplete="off" required>
+        <button type="submit" id="gate-submit">Войти</button>
+        <div class="gate-error" id="gate-error"></div>
+      </form>
+    </div>
+  </section>
+
+  <div class="page hidden" id="app">
+    <section class="panel">
+      <div class="controls">
+        <button type="button" id="add-row">+ ряд</button>
+        <button type="button" id="remove-row">- ряд</button>
+        <button type="button" id="add-col">+ столбец</button>
+        <button type="button" id="remove-col">- столбец</button>
+        <button type="button" id="mode-add">добавить</button>
+        <button type="button" id="mode-remove">удалить</button>
+        <button type="button" id="save-layout">сохранить</button>
+        <button type="button" id="clear">очистить</button>
+        <button type="button" id="logout">выйти</button>
+      </div>
+      <div class="status" id="status">Подключение...</div>
+    </section>
+
+    <section class="board-wrap">
+      <div class="board" id="board" aria-label="Сетка квадратов"></div>
+    </section>
+  </div>
+
+  <script type="module">
+    import {
+      SUPABASE_FUNCTIONS_BASE,
+      GRID_API_FUNCTION_NAME,
+      SESSION_STORAGE_KEY
+    } from "./supabase-config.js";
+
+    const MIN_SIZE = 1;
+    const SYNC_INTERVAL_MS = 1500;
+    const DEFAULT_STATE = {
+      rows: 4,
+      cols: 4,
+      cells: []
+    };
+
+    const gate = document.getElementById("gate");
+    const app = document.getElementById("app");
+    const gateForm = document.getElementById("gate-form");
+    const gateSubmit = document.getElementById("gate-submit");
+    const accessCodeInput = document.getElementById("access-code");
+    const gateError = document.getElementById("gate-error");
+
+    const board = document.getElementById("board");
+    const status = document.getElementById("status");
+    const addRowButton = document.getElementById("add-row");
+    const removeRowButton = document.getElementById("remove-row");
+    const addColButton = document.getElementById("add-col");
+    const removeColButton = document.getElementById("remove-col");
+    const addModeButton = document.getElementById("mode-add");
+    const removeModeButton = document.getElementById("mode-remove");
+    const saveLayoutButton = document.getElementById("save-layout");
+    const clearButton = document.getElementById("clear");
+    const logoutButton = document.getElementById("logout");
+
+    const functionUrl = SUPABASE_FUNCTIONS_BASE.replace(/\/$/, "") + "/" + GRID_API_FUNCTION_NAME;
+
+    let sessionToken = localStorage.getItem(SESSION_STORAGE_KEY) || "";
+    let state = normalizeState(DEFAULT_STATE);
+    let serverVersion = 0;
+    let layoutDirty = false;
+    let editMode = "mark";
+    let requestInFlight = false;
+    let lastError = "";
+
+    function createCells(rows, cols, existing = []) {
+      const nextCells = [];
+
+      for (let row = 0; row < rows; row += 1) {
+        const currentRow = [];
+
+        for (let col = 0; col < cols; col += 1) {
+          const source = existing[row] && existing[row][col];
+          currentRow.push({
+            enabled: Boolean(source && source.enabled),
+            marked: Boolean(source && source.marked)
+          });
+        }
+
+        nextCells.push(currentRow);
+      }
+
+      return nextCells;
+    }
+
+    function normalizeState(source) {
+      const rows = Math.max(MIN_SIZE, Number(source?.rows) || DEFAULT_STATE.rows);
+      const cols = Math.max(MIN_SIZE, Number(source?.cols) || DEFAULT_STATE.cols);
+
+      return {
+        rows,
+        cols,
+        cells: createCells(rows, cols, source?.cells || [])
+      };
+    }
+
+    function countEnabledCells(cells) {
+      let total = 0;
+
+      for (const row of cells) {
+        for (const cell of row) {
+          if (cell.enabled) {
+            total += 1;
+          }
+        }
+      }
+
+      return total;
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.classList.toggle("is-error", isError);
+    }
+
+    function setGateError(message) {
+      gateError.textContent = message;
+    }
+
+    function showGate() {
+      gate.classList.remove("hidden");
+      app.classList.add("hidden");
+    }
+
+    function showApp() {
+      gate.classList.add("hidden");
+      app.classList.remove("hidden");
+    }
+
+    function updateStatus() {
+      const summary = state.rows + " x " + state.cols + " | квадратов: " + countEnabledCells(state.cells);
+
+      if (lastError) {
+        setStatus(summary + " | " + lastError, true);
+        return;
+      }
+
+      if (requestInFlight) {
+        setStatus(summary + " | синхронизация...");
+        return;
+      }
+
+      if (layoutDirty) {
+        setStatus(summary + " | есть несохранённые изменения");
+        return;
+      }
+
+      setStatus(summary + " | синхронизировано");
+    }
+
+    function updateModeButtons() {
+      addModeButton.classList.toggle("is-selected", editMode === "add");
+      removeModeButton.classList.toggle("is-selected", editMode === "remove");
+    }
+
+    function updateControls() {
+      removeRowButton.disabled = state.rows <= MIN_SIZE || requestInFlight;
+      removeColButton.disabled = state.cols <= MIN_SIZE || requestInFlight;
+      saveLayoutButton.disabled = !layoutDirty || requestInFlight;
+      addRowButton.disabled = requestInFlight;
+      addColButton.disabled = requestInFlight;
+      addModeButton.disabled = requestInFlight;
+      removeModeButton.disabled = requestInFlight;
+      clearButton.disabled = requestInFlight;
+      logoutButton.disabled = requestInFlight;
+    }
+
+    function render() {
+      board.innerHTML = "";
+      board.style.gridTemplateColumns = "repeat(" + state.cols + ", var(--cell-size))";
+      updateModeButtons();
+      updateControls();
+      updateStatus();
+
+      for (let row = 0; row < state.rows; row += 1) {
+        for (let col = 0; col < state.cols; col += 1) {
+          const currentCell = state.cells[row][col];
+          const slot = document.createElement("div");
+          const hideEmptyCell = !currentCell.enabled && !layoutDirty && editMode !== "add";
+
+          slot.className = "cell-slot";
+          if (hideEmptyCell) {
+            slot.classList.add("is-hidden");
+          }
+
+          if (currentCell.enabled) {
+            const cell = document.createElement("button");
+            cell.type = "button";
+            cell.className = "cell";
+            cell.disabled = requestInFlight;
+            cell.setAttribute("aria-label", "Квадрат " + (row + 1) + ":" + (col + 1));
+
+            if (currentCell.marked) {
+              cell.classList.add("is-active");
+            }
+
+            cell.addEventListener("click", async () => {
+              if (requestInFlight) {
+                return;
+              }
+
+              if (editMode === "remove") {
+                state.cells[row][col] = { enabled: false, marked: false };
+                layoutDirty = true;
+                lastError = "";
+                render();
+                return;
+              }
+
+              if (editMode === "add") {
+                return;
+              }
+
+              state.cells[row][col].marked = !state.cells[row][col].marked;
+              lastError = "";
+              render();
+              await saveState();
+            });
+
+            slot.appendChild(cell);
+          } else {
+            const emptyCell = document.createElement("button");
+            emptyCell.type = "button";
+            emptyCell.className = "cell-empty";
+            emptyCell.disabled = requestInFlight || editMode !== "add";
+            emptyCell.setAttribute("aria-label", "Пустая ячейка " + (row + 1) + ":" + (col + 1));
+            emptyCell.addEventListener("click", () => {
+              if (requestInFlight || editMode !== "add") {
+                return;
+              }
+
+              state.cells[row][col] = { enabled: true, marked: false };
+              layoutDirty = true;
+              lastError = "";
+              render();
+            });
+            slot.appendChild(emptyCell);
+          }
+
+          board.appendChild(slot);
+        }
+      }
+    }
+
+    async function apiRequest(action, payload = {}) {
+      const response = await fetch(functionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action,
+          session_token: sessionToken,
+          ...payload
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "ошибка запроса");
+      }
+
+      return data;
+    }
+
+    async function login(code) {
+      gateSubmit.disabled = true;
+      setGateError("");
+
+      try {
+        const data = await apiRequest("login", { access_code: code });
+        sessionToken = data.session_token || "";
+        localStorage.setItem(SESSION_STORAGE_KEY, sessionToken);
+        showApp();
+        await fetchState(false);
+      } catch (error) {
+        sessionToken = "";
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        setGateError(error.message);
+        showGate();
+      } finally {
+        gateSubmit.disabled = false;
+      }
+    }
+
+    async function fetchState(silent = false) {
+      if (requestInFlight && silent) {
+        return;
+      }
+
+      try {
+        if (!silent) {
+          requestInFlight = true;
+          render();
+        }
+
+        const data = await apiRequest("get_state");
+        if (!layoutDirty) {
+          state = normalizeState(data.state);
+          serverVersion = Number(data.version) || 1;
+          lastError = "";
+        } else {
+          serverVersion = Number(data.version) || serverVersion;
+        }
+      } catch (error) {
+        if (error.message === "unauthorized") {
+          logout();
+          return;
+        }
+        lastError = error.message;
+      } finally {
+        requestInFlight = false;
+        render();
+      }
+    }
+
+    async function saveState() {
+      requestInFlight = true;
+      render();
+
+      try {
+        const data = await apiRequest("save_state", {
+          base_version: serverVersion,
+          state
+        });
+
+        state = normalizeState(data.state);
+        serverVersion = Number(data.version) || serverVersion;
+        layoutDirty = false;
+        lastError = "";
+        return true;
+      } catch (error) {
+        if (error.message === "conflict") {
+          await fetchState(true);
+          layoutDirty = false;
+          lastError = "конфликт: данные уже изменил другой сотрудник";
+        } else if (error.message === "unauthorized") {
+          logout();
+          return false;
+        } else {
+          lastError = error.message;
+        }
+
+        return false;
+      } finally {
+        requestInFlight = false;
+        render();
+      }
+    }
+
+    function resizeGrid(nextRows, nextCols) {
+      state = {
+        rows: nextRows,
+        cols: nextCols,
+        cells: createCells(nextRows, nextCols, state.cells)
+      };
+
+      layoutDirty = true;
+      lastError = "";
+      render();
+    }
+
+    function logout() {
+      sessionToken = "";
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      layoutDirty = false;
+      lastError = "";
+      setGateError("");
+      accessCodeInput.value = "";
+      showGate();
+    }
+
+    gateForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const code = accessCodeInput.value.trim();
+      if (!code) {
+        setGateError("введите код доступа");
+        return;
+      }
+      await login(code);
+    });
+
+    addRowButton.addEventListener("click", () => {
+      resizeGrid(state.rows + 1, state.cols);
+    });
+
+    removeRowButton.addEventListener("click", () => {
+      resizeGrid(Math.max(MIN_SIZE, state.rows - 1), state.cols);
+    });
+
+    addColButton.addEventListener("click", () => {
+      resizeGrid(state.rows, state.cols + 1);
+    });
+
+    removeColButton.addEventListener("click", () => {
+      resizeGrid(state.rows, Math.max(MIN_SIZE, state.cols - 1));
+    });
+
+    addModeButton.addEventListener("click", () => {
+      editMode = editMode === "add" ? "mark" : "add";
+      render();
+    });
+
+    removeModeButton.addEventListener("click", () => {
+      editMode = editMode === "remove" ? "mark" : "remove";
+      render();
+    });
+
+    saveLayoutButton.addEventListener("click", async () => {
+      await saveState();
+    });
+
+    clearButton.addEventListener("click", () => {
+      state.cells = createCells(state.rows, state.cols);
+      layoutDirty = true;
+      lastError = "";
+      render();
+    });
+
+    logoutButton.addEventListener("click", () => {
+      logout();
+    });
+
+    if (sessionToken) {
+      showApp();
+      render();
+      await fetchState(false);
+    } else {
+      showGate();
+    }
+
+    setInterval(() => {
+      if (sessionToken && !layoutDirty && !requestInFlight) {
+        fetchState(true);
+      }
+    }, SYNC_INTERVAL_MS);
+  </script>
+</body>
+</html>
